@@ -1,0 +1,27 @@
+#########################################
+#
+#   Variabili da inserire
+#
+#########################################
+
+
+$HOSTNAME = "pippo"
+$DOMAIN_USER = "TUO_NOME_DEL_DOMINIO"
+$DOMAIN
+
+#########################################
+#
+#   variabli d'ambiente
+#
+#########################################
+
+$ACTUAL_HOSTNAME = hostname
+$report_check = $test_URL_rew = test-path -path $report_file
+if ($env:UserName -eq "systemadm") 
+    {
+        $report_file = "C:\Users\Administrator\Desktop\$ACTUAL_HOSTNAME-report.txt"
+    } 
+    else 
+        {
+            $report_file = "C:\Users\$env:UserName\Desktop\$ACTUAL_HOSTNAME-report.txt"
+        }

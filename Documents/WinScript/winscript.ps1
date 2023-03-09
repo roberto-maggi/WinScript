@@ -1,10 +1,21 @@
+
+#########################################
+#
+#   import var file
+#
+#########################################
+
+. .vars/vars.txt
+
+$ACTUAL_HOSTNAME = hostname
+
 if ($env:UserName -eq "systemadm") 
     {
-        $report_file = "C:\Users\Administrator\Desktop\report.txt"
+        $report_file = "C:\Users\Administrator\Desktop\$ACTUAL_HOSTNAME-report.txt"
     } 
     else 
         {
-            $report_file = "C:\Users\$env:UserName\Desktop\report.txt"
+            $report_file = "C:\Users\$env:UserName\Desktop\$ACTUAL_HOSTNAME-report.txt"
         }
 
 
@@ -35,10 +46,12 @@ echo "" | Out-File -append $report_file
 # Hardware della VM
 echo "Hardware, CPU, Core e RAM e Dischi" | Out-File -append $report_file
 echo "----" | Out-File -append $report_file
-$c = Get-WmiObject Win32_ComputerSystem; echo "CPU " $c.NumberOfProcessors | Out-File -append $report_file; echo "Core " $c.NumberOfLogicalProcessors | Out-File -append $report_file; echo "RAM " @([math]::round($c.TotalPhysicalMemory/1GB))GB | Out-File -append $report_file
+$c = Get-WmiObject Win32_ComputerSystem; echo ("CPU" + " " + $c.NumberOfProcessors) ; echo ("Core " + " " +  $c.NumberOfLogicalProcessors ) ; echo "RAM " @([math]::round($c.TotalPhysicalMemory/1GB))GB
 #Dischi
-Get-CimInstance -ClassName Win32_Volume| select DriveLetter, BlockSize, Capacity, FreeSpace | Select-Object DriveLetter, @{Name="Size(GB)";Expression={[math]::round($_.capacity/1GB)}}, @{Name="Free(GB)";Expression={[math]::round($_.freeSpace/1GB)}}, BlockSize | Format-Table -AutoSize | Out-File -append $report_file
+Get-CimInstance -ClassName Win32_Volume| select Label,  DriveLetter, BlockSize, Capacity, FreeSpace | Select-Object DriveLetter, Label,  @{Name="Size(GB)";Expression={[math]::round($_.capacity/1GB)}}, @{Name="Free(GB)";Expression={[math]::round($_.freeSpace/1GB)}}, BlockSize  | Out-File -append $report_file
 echo "" | Out-File -append $report_file
+ Get-CimInstance -ClassName Win32_Volume | Select-Object Label, BlockSize | Format-Table -AutoSize
+
 
 #users
 echo "Utenti" | Out-File -append $report_file
@@ -51,6 +64,7 @@ Get-LocalUser | foreach-object {
 echo "" | Out-File -append $report_file
 
 # Software
+Get-WindowsFeature | ? Installed | Out-File -append $report_file
 echo "Software" | Out-File -append $report_file
 echo "----" | Out-File -append $report_file
 $SoftWares="Web-Server"
@@ -125,10 +139,18 @@ if(($test_SQL_server))
         else
             echo "Can not find SQL server installed on the host"  | Out-File -append $report_file
     }
+# check trend micro, wmware tools, NXlog, visual studio, ecc
+$InstalledSoftware = Get-ChildItem "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall"
+foreach($obj in $InstalledSoftware){echo $obj.GetValue('DisplayName') | Out-File -append $report_file } 
+
 
 # Network
 echo "Network" | Out-File -append $report_file
 echo "----" | Out-File -append $report_file
 Get-NetAdapter -Name * | findstr.exe "vmxnet3" | Out-File -append $report_file
+# disabilita RegisterThisConnectionsAddress0 su TUTTE le NIC tranne la "Produzione"
+Get-NetIPConfiguration | Get-NetConnectionProfile | Where InterfaceAlias -ne "Produzione" | Set-DnsClient -RegisterThisConnectionsAddress:$false -Verbose
 echo "e sono rispettivamente:" | Out-File -append $report_file
-(Get-WmiObject Win32_NetworkAdapterConfiguration | Where-Object {$_.IPEnabled -eq "True"}).FullDNSRegistrationEnabled | Out-File -append $report_file
+Get-DnsClient | select InterfaceAlias, RegisterThisConnectionsAddress| Format-Table -AutoSize | findstr /v isatap | findstr /v Loopback | Out-File -append $report_file
+Get-NetIPAddress -Addressfamily IPv4 | select InterfaceAlias, IPAddress | Format-Table -AutoSize |findstr /v Loopback
+
